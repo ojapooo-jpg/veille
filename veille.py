@@ -123,7 +123,6 @@ def main():
 
     vus = set(json.loads(DEJA_VUS.read_text())) if DEJA_VUS.exists() else set()
     for u in uniques: u["nouveau"] = norm(u["titre"]) not in vus
-    DEJA_VUS.write_text(json.dumps(sorted(vus | {norm(u["titre"]) for u in uniques})[-5000:]))
     uniques.sort(key=lambda x: (not x["nouveau"], -x["score"], -(x["date"].timestamp() if x["date"] else 0)))
 
     maintenant = datetime.now()
@@ -143,7 +142,10 @@ def main():
     print(f"{len(tous)} articles lus · {len(uniques)} retenus · {nb_new} nouveaux")
     print(f"Rapport : {fichier}")
     if erreurs: print("Sources en erreur :", "; ".join(erreurs))
-    telegram(uniques, maintenant)
+    envoye = telegram(uniques, maintenant)
+    # si Telegram est configuré mais n'a pas pu envoyer, on garde les articles comme "nouveaux"
+    if envoye is not False:
+        DEJA_VUS.write_text(json.dumps(sorted(vus | {norm(u["titre"]) for u in uniques})[-5000:]))
     if "--ouvrir" in sys.argv: webbrowser.open(fichier.as_uri())
 
 def tg(methode, **params):
@@ -162,16 +164,16 @@ def trouver_chats():
             m = u.get("message") or u.get("channel_post") or {}
             if m.get("chat", {}).get("id"): ids.add(str(m["chat"]["id"]))
     except Exception as e:
-        print("getUpdates :", e)
+        print("getUpdates :", e, "(token invalide ?)")
     if ids: f.write_text("\n".join(sorted(ids)) + "\n")
     return sorted(ids)
 
 def telegram(items, quand):
     if not os.environ.get("TELEGRAM_TOKEN"):
-        return
+        return None
     chats = trouver_chats()
     if not chats:
-        print("Telegram : aucun chat trouvé. Envoie /start à ton bot puis relance."); return
+        print("Telegram : aucun chat trouvé. Envoie /start à ton bot puis relance."); return False
     nouveaux = [u for u in items if u["nouveau"]][: int(os.environ.get("TELEGRAM_MAX", "15"))]
     e = html.escape
     lignes = [f"🗞 <b>Veille actu · {quand:%d/%m %H:%M}</b>",
@@ -196,6 +198,7 @@ def telegram(items, quand):
             try: tg("sendMessage", chat_id=chat, text=m, parse_mode="HTML", disable_web_page_preview="true")
             except Exception as ex: print("Telegram :", chat, ex)
     print(f"Telegram : envoyé à {len(chats)} chat(s)")
+    return True
 
 def rendu(items, erreurs, quand):
     e = html.escape
