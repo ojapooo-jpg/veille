@@ -1,0 +1,25 @@
+name: Script vidéo
+
+on:
+  repository_dispatch:
+    types: [script]
+
+concurrency:
+  group: script-${{ github.event.client_payload.id || github.run_id }}
+
+jobs:
+  script:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet anthropic
+      - name: Écriture du script
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          PAYLOAD: ${{ toJson(github.event.client_payload) }}
+        run: python script.py

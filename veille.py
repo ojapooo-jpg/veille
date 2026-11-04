@@ -4,7 +4,7 @@ classe par score, supprime les doublons et génère un rapport HTML + archive CS
 Usage : python veille.py            (utilise config.json à côté du script)
         python veille.py --ouvrir   (ouvre le rapport dans le navigateur à la fin)
 Aucune dépendance : Python 3.8+ suffit."""
-import csv, html, json, os, re, sys, unicodedata, urllib.parse, urllib.request, webbrowser
+import csv, hashlib, html, json, os, re, sys, unicodedata, urllib.parse, urllib.request, webbrowser
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
@@ -18,6 +18,7 @@ EN_LIGNE = bool(os.environ.get("GITHUB_ACTIONS"))
 SORTIE = ICI / ("docs" if EN_LIGNE else "rapports"); SORTIE.mkdir(exist_ok=True)
 DEJA_VUS = ICI / "deja_vus.json"
 ARCHIVE = ICI / "archive.csv"
+ARTICLES = ICI / "articles.json"   # pour le bot : id -> article
 UA = {"User-Agent": "Mozilla/5.0 (veille-actu)"}
 POIDS = {"forts": 3, "moyens": 2, "judiciaire": 1}
 
@@ -121,6 +122,16 @@ def main():
     for u in uniques:  # plusieurs médias = sujet plus important
         u["score"] += len(u.get("autres", ()))
 
+    for u in uniques:
+        u["id"] = hashlib.sha1((u["lien"] or u["titre"]).encode()).hexdigest()[:10]
+    index = json.loads(ARTICLES.read_text(encoding="utf-8")) if ARTICLES.exists() else {}
+    for u in uniques:
+        index[u["id"]] = {"titre": u["titre"], "lien": u["lien"], "media": u["source_media"],
+                          "resume": u["resume"][:600], "date": u["date"].isoformat() if u["date"] else "",
+                          "vu": datetime.now(timezone.utc).isoformat()}
+    index = dict(sorted(index.items(), key=lambda kv: kv[1]["vu"])[-600:])
+    ARTICLES.write_text(json.dumps(index, ensure_ascii=False, indent=0), encoding="utf-8")
+
     vus = set(json.loads(DEJA_VUS.read_text())) if DEJA_VUS.exists() else set()
     for u in uniques: u["nouveau"] = norm(u["titre"]) not in vus
     uniques.sort(key=lambda x: (not x["nouveau"], -x["score"], -(x["date"].timestamp() if x["date"] else 0)))
@@ -180,22 +191,29 @@ def telegram(items, quand):
               f"{sum(u['nouveau'] for u in items)} nouveaux articles · {len(items)} au total"]
     page = os.environ.get("PAGE_URL")
     if page: lignes.append(f'📄 <a href="{e(page)}">Rapport complet</a>')
-    blocs = ["\n".join(lignes)]
-    for u in nouveaux:
+    entete = "\n".join(lignes)
+    blocs = []  # (texte, id ou None)
+    for n, u in enumerate(nouveaux, 1):
         pastille = "🔴" if u["score"] >= 9 else "🟡" if u["score"] >= 6 else "⚪"
         autres = len(u.get("autres", ()))
-        blocs.append(f"{pastille} <b>{u['score']}</b> · {e(u['source_media'])}{f' (+{autres} médias)' if autres else ''}\n"
-                     f'<a href="{e(u["lien"])}">{e(u["titre"])}</a>')
-    if not nouveaux: blocs.append("Rien de nouveau depuis la dernière veille.")
-    # découpe en messages < 4000 caractères
-    messages, cur = [], ""
-    for b in blocs:
-        if len(cur) + len(b) + 2 > 3900: messages.append(cur); cur = ""
-        cur += b + "\n\n"
-    messages.append(cur)
+        blocs.append((f"<b>{n}.</b> {pastille} <b>{u['score']}</b> · {e(u['source_media'])}{f' (+{autres} médias)' if autres else ''}\n"
+                      f'<a href="{e(u["lien"])}">{e(u["titre"])}</a>', (n, u["id"])))
+    if not nouveaux: blocs.append(("Rien de nouveau depuis la dernière veille.", None))
+    else: blocs.append(("🎬 <i>Appuie sur un numéro pour recevoir le script vidéo.</i>", None))
+    # découpe en messages < 4000 caractères, chacun avec ses boutons
+    messages, cur, boutons = [], entete + "\n\n", []
+    for texte, ref in blocs:
+        if len(cur) + len(texte) + 2 > 3900:
+            messages.append((cur, boutons)); cur, boutons = "", []
+        cur += texte + "\n\n"
+        if ref: boutons.append({"text": f"🎬 {ref[0]}", "callback_data": f"s:{ref[1]}"})
+    messages.append((cur, boutons))
     for chat in chats:
-        for m in messages:
-            try: tg("sendMessage", chat_id=chat, text=m, parse_mode="HTML", disable_web_page_preview="true")
+        for m, btns in messages:
+            params = dict(chat_id=chat, text=m, parse_mode="HTML", disable_web_page_preview="true")
+            if btns:
+                params["reply_markup"] = json.dumps({"inline_keyboard": [btns[i:i + 5] for i in range(0, len(btns), 5)]})
+            try: tg("sendMessage", **params)
             except Exception as ex: print("Telegram :", chat, ex)
     print(f"Telegram : envoyé à {len(chats)} chat(s)")
     return True

@@ -1,0 +1,45 @@
+name: Déployer le bot
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Préparation
+        id: prep
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        run: |
+          echo "secret=$(printf '%s' "$TELEGRAM_TOKEN" | sha256sum | cut -c1-40)" >> "$GITHUB_OUTPUT"
+          echo "chats=$(tr -s '[:space:]' ',' < chat_id.txt | sed 's/^,//;s/,$//')" >> "$GITHUB_OUTPUT"
+      - name: Déploiement Cloudflare
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          command: deploy --var ALLOWED_CHATS:${{ steps.prep.outputs.chats }} --var REPO:${{ github.repository }}
+          secrets: |
+            TELEGRAM_TOKEN
+            GH_DISPATCH_TOKEN
+            WEBHOOK_SECRET
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          GH_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
+          WEBHOOK_SECRET: ${{ steps.prep.outputs.secret }}
+      - name: Brancher Telegram sur le bot
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          URL: ${{ steps.deploy.outputs.deployment-url }}
+          SECRET: ${{ steps.prep.outputs.secret }}
+        run: |
+          echo "URL du bot : $URL"
+          test -n "$URL" || { echo "URL introuvable"; exit 1; }
+          curl -sS "https://api.telegram.org/bot${TELEGRAM_TOKEN}/setWebhook" \
+            --data-urlencode "url=${URL}" \
+            --data-urlencode "secret_token=${SECRET}" \
+            --data-urlencode 'allowed_updates=["message","callback_query"]' | tee /dev/stderr | grep -q '"ok":true'
