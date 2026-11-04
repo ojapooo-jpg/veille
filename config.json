@@ -1,0 +1,42 @@
+{
+  "jours": 2,
+  "recherches_google_news": [
+    "maghrébin agression",
+    "musulmans menaces",
+    "islamophobie",
+    "mosquée tag OR incendie OR profanée",
+    "acte raciste tribunal",
+    "propos racistes condamné",
+    "provocation à la haine raciale",
+    "CNews Arcom",
+    "Zemmour propos",
+    "pétition CNews",
+    "Pharos signalement raciste",
+    "attentat raciste",
+    "discrimination arabes",
+    "voile agression",
+    "Algérien OR Marocain OR Tunisien agressé",
+    "remigration",
+    "contrôle au faciès"
+  ],
+  "flux_rss": {
+    "Le Monde": "https://www.lemonde.fr/rss/une.xml",
+    "20 Minutes": "https://www.20minutes.fr/feeds/rss-une.xml",
+    "Franceinfo": "https://www.francetvinfo.fr/titres.rss",
+    "France 3 Régions": "https://france3-regions.francetvinfo.fr/societe/rss",
+    "Le Parisien": "https://www.leparisien.fr/arc/outboundfeeds/rss.xml",
+    "Ouest-France": "https://www.ouest-france.fr/rss/une",
+    "Libération": "https://www.liberation.fr/arc/outboundfeeds/rss-all/?outputType=xml",
+    "Mediapart": "https://www.mediapart.fr/articles/feed",
+    "StreetPress": "https://www.streetpress.com/rss.xml",
+    "BFMTV": "https://www.bfmtv.com/rss/news-24-7/",
+    "Le Figaro": "https://www.lefigaro.fr/rss/figaro_actualites.xml",
+    "Arcom": "https://www.arcom.fr/rss.xml"
+  },
+  "mots_cles": {
+    "forts": ["maghrébin", "maghrebin", "musulman", "islamophob", "mosquée", "raciste", "racisme", "haine raciale", "arabe", "algérien", "marocain", "tunisien", "voilée", "voile", "remigration", "attentat raciste", "fuck muslims", "ratonnade"],
+    "moyens": ["cnews", "zemmour", "arcom", "pharos", "discrimination", "xénophob", "extrême droite", "ultradroite", "faciès", "banlieue", "immigré", "immigration", "islam"],
+    "judiciaire": ["tribunal", "condamné", "procès", "garde à vue", "interpellé", "mis en examen", "parquet", "procureur", "plainte", "agression", "menaces de mort", "perquisition", "sursis"]
+  },
+  "score_minimum": 3
+}

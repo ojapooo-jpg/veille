@@ -1,0 +1,31 @@
+name: Veille actu
+
+on:
+  schedule:
+    - cron: "0 6 * * *"    # 07:00 heure de Paris (hiver)
+    - cron: "0 17 * * *"   # 18:00 heure de Paris (hiver)
+  workflow_dispatch:       # bouton "Run workflow" pour lancer à la main
+
+permissions:
+  contents: write
+
+jobs:
+  veille:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Collecte des articles
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          PAGE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+        run: python veille.py
+      - name: Sauvegarde (historique + page)
+        run: |
+          git config user.name "veille-bot"
+          git config user.email "veille-bot@users.noreply.github.com"
+          git add -A docs deja_vus.json archive.csv chat_id.txt 2>/dev/null || true
+          git commit -m "Veille $(date -u +'%Y-%m-%d %H:%M')" || echo "Rien à enregistrer"
+          git push
