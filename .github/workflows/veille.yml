@@ -26,6 +26,6 @@ jobs:
         run: |
           git config user.name "veille-bot"
           git config user.email "veille-bot@users.noreply.github.com"
-          for f in docs deja_vus.json archive.csv chat_id.txt; do [ -e "$f" ] && git add -A "$f"; done
+          for f in docs deja_vus.json archive.csv chat_id.txt; do if [ -e "$f" ]; then git add -A "$f"; fi; done
           git commit -m "Veille $(date -u +'%Y-%m-%d %H:%M')" || echo "Rien à enregistrer"
           git push
